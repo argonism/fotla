@@ -1,0 +1,84 @@
+[tool]
+[tool.poetry]
+name = "fotla"
+version = "0.1.0"
+homepage = "https://github.com/argonism/fotla"
+description = "application framework for retrival models fresh off the lab."
+authors = ["k-ush <argoooooon@gmail.com>"]
+readme = "README.md"
+license = "Apache-2.0"
+classifiers = [
+  'Development Status :: 2 - Pre-Alpha',
+  'Intended Audience :: Developers',
+  'License :: OSI Approved :: Apache Software License',
+  'Natural Language :: English',
+  'Programming Language :: Python :: 3',
+  'Programming Language :: Python :: 3.8',
+  'Programming Language :: Python :: 3.9',
+  'Programming Language :: Python :: 3.10',
+  'Programming Language :: Python :: 3.11',
+  'Programming Language :: Python :: 3.12',
+]
+packages = [{ include = "fotla" }, { include = "tests", format = "sdist" }]
+
+[tool.poetry.dependencies]
+python = ">=3.8,<4.0"
+
+[tool.poetry.group.dev.dependencies]
+black = "^23.9.1"
+isort = "^5.12.0"
+flake8-docstrings = "^1.7.0"
+mypy = "^1.5.1"
+pytest = "^7.4.2"
+pytest-cov = "^4.1.0"
+tox = "^4.11.3"
+virtualenv = "^20.24.5"
+pip = "^23.2.1"
+pre-commit = "^3.4.0"
+toml = "^0.10.2"
+bump2version = "^1.0.1"
+click = "^8.1.7"
+
+[tool.poetry.group.docs.dependencies]
+mkdocs = "^1.5.3"
+mkdocs-include-markdown-plugin = "^1.0.0"
+mkdocs-material = "^9.4.3"
+mkdocs-material-extensions = "^1.2"
+mkdocs-autorefs = "^0.5.0"
+mkdocstrings = { version = "^0.23.0", extras = ["python"] }
+mkdocs-macros-plugin = "^1.0.4"
+
+[tool.black]
+line-length = 120
+skip-string-normalization = true
+target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+line_length = 120
+skip_gitignore = true
+# you can skip files as below
+#skip_glob = docs/conf.py
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
