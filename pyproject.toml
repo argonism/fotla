@@ -19,10 +19,17 @@ classifiers = [
   'Programming Language :: Python :: 3.11',
   'Programming Language :: Python :: 3.12',
 ]
-packages = [{ include = "fotla" }, { include = "tests", format = "sdist" }]
+packages = [{ include = "fotla" }]
 
 [tool.poetry.dependencies]
 python = ">=3.8,<4.0"
+fastapi = "^0.103.2"
+more-itertools = "^10.1.0"
+numpy = "1.24.4"
+transformers = { version = "^4.34.1", extras = ["encoder"] }
+elasticsearch = { version = "^8.10.1", extras = ["elasticsearch"] }
+torch = { version = "^2.1.1", extras = ["encoder"] }
+uvicorn = "^0.24.0.post1"
 
 [tool.poetry.group.dev.dependencies]
 black = "^23.9.1"
@@ -38,6 +45,7 @@ pre-commit = "^3.4.0"
 toml = "^0.10.2"
 bump2version = "^1.0.1"
 click = "^8.1.7"
+ruff = "^0.0.292"
 
 [tool.poetry.group.docs.dependencies]
 mkdocs = "^1.5.3"
@@ -49,9 +57,8 @@ mkdocstrings = { version = "^0.23.0", extras = ["python"] }
 mkdocs-macros-plugin = "^1.0.4"
 
 [tool.black]
-line-length = 120
+line-length = 86
 skip-string-normalization = true
-target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
 include = '\.pyi?$'
 exclude = '''
 /(
@@ -74,10 +81,8 @@ include_trailing_comma = true
 force_grid_wrap = 0
 use_parentheses = true
 ensure_newline_before_comments = true
-line_length = 120
+line_length = 86
 skip_gitignore = true
-# you can skip files as below
-#skip_glob = docs/conf.py
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

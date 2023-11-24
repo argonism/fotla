@@ -1,0 +1,26 @@
+{
+  "mappings": {
+    "properties": {
+      "vec": {
+        "type": "dense_vector",
+        "dims": 768,
+        "index": true,
+        "similarity": "dot_product",
+        "index_options": {
+          "type" : "hnsw",
+          "m" : 15,
+          "ef_construction" : 50
+        }
+      },
+      "doc_id" : {
+        "type" : "keyword"
+      },
+      "title" : {
+        "type" : "text"
+      },
+      "text" : {
+        "type" : "text"
+      }
+    }
+  }
+}

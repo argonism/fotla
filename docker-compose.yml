@@ -1,0 +1,54 @@
+version: "3"
+
+services:
+  fotla-backend:
+    build:
+      context: .
+      dockerfile: fotla/backend/Dockerfile
+    working_dir: /usr/fotla
+    tty: true
+    ports:
+      - 9999:9999
+    volumes:
+      - ./:/usr/fotla
+    entrypoint: python main.py
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      - ELASTICSEARCH_HOST=${ELASTICSEARCH_HOST}
+      - ELASTICSEARCH_PORT=${ELASTICSEARCH_PORT}
+
+  elasticsearch:
+    build:
+      context: .
+      dockerfile: vector_indexer/elasticsearch/Dockerfile
+      args:
+        - ELASTIC_VERSION=${ELASTIC_VERSION}
+    environment:
+      - node.name=elasticsearch
+      - cluster.name=es-docker-cluster
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - xpack.security.enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - esdata1:/usr/share/elasticsearch/data
+    ports:
+      - 9200:9200
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -sk http://localhost:9200/ | grep -q 'You Know, for Search'",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 120
+
+volumes:
+  esdata1:
+    driver: local
