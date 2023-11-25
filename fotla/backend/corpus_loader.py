@@ -2,12 +2,12 @@ import abc
 import json
 from typing import Dict, Iterator, List
 
-if False:
-    from typing import Type
-
 from more_itertools import chunked
 from pydantic import BaseModel
 from tqdm import tqdm
+
+if False:
+    from typing import Type
 
 
 class Doc(BaseModel):
@@ -23,7 +23,7 @@ class CorpusLoader(abc.ABC):
 
 class JsonlCorpusLoader(CorpusLoader):
     def __init__(
-        self, path: str, data_type: Type[Doc] = Doc, verbose: bool = True
+        self, path: str, data_type: "Type[Doc]" = Doc, verbose: bool = True
     ) -> None:
         self.path = path
         self.data_type = data_type
