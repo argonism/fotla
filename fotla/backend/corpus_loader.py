@@ -1,9 +1,9 @@
 import abc
 import json
+from typing import Dict, Iterator, List
 
 if False:
-    from typing import Dict, Iterator, List, Type
-
+    from typing import Type
 
 from more_itertools import chunked
 from pydantic import BaseModel
