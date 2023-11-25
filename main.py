@@ -1,39 +1,50 @@
 import os
 
-from fotla.backend.api import start_api
 from fotla.backend.corpus_loader import AdhocCorpusLoader
+from fotla.backend.encoder import HFSymetricDenseEncoder
 from fotla.backend.indexer.elasticsearch import (
-    ElasticsearchBM25,
     ElasticsearchConfig,
     ElasticsearchIndexer,
 )
+from fotla.backend.retriever import DenseRetriever
 
 
 def main():
-    # HFSymetricDenseEncoder("facebook/mcontriever-msmarco")
     es_host = os.environ.get("ELASTICSEARCH_HOST", "localhost")
     es_port = os.environ.get("ELASTICSEARCH_PORT", 9200)
-    indexer = ElasticsearchIndexer(ElasticsearchConfig(es_host, es_port))
+    es_config = ElasticsearchConfig(es_host, es_port)
+    indexer = ElasticsearchIndexer(es_config, recreate_index=True)
 
-    # retriever = DenseRetriever(encoder, indexer)
-    retriever = ElasticsearchBM25(indexer)
+    encoder = HFSymetricDenseEncoder("facebook/mcontriever-msmarco")
+    retriever = DenseRetriever(encoder, indexer)
+    # retriever = ElasticsearchBM25(indexer)
 
     corpus_loader = AdhocCorpusLoader(
         [
-            {"doc_id": "1", "text": "hello! This is the first doc."},
-            {"doc_id": "2", "text": "world! This is the second doc."},
-            {"doc_id": "3", "text": "This is the third doc."},
+            {
+                "doc_id": "1",
+                "text": "hello! This is the first doc.",
+                "title": "first doc",
+            },
+            {
+                "doc_id": "2",
+                "text": "world! This is the second doc.",
+                "title": "second doc",
+            },
+            {
+                "doc_id": "3",
+                "text": "hello world! This is the third doc.",
+                "title": "third doc",
+            },
+            {"doc_id": "3", "text": "This is the forth doc.", "title": "forth doc"},
         ]
     )
     retriever.index(corpus_loader)
-    start_api(retriever, port=9999)
+    # start_api(retriever, port=9999)
 
-    # results = retriever.retrieve(["hello world"], 10)
-    # print(results)
+    results = retriever.retrieve(["hello world"], 10)
+    print(results)
 
 
 if __name__ == '__main__':
-    import logging
-
-    logging.basicConfig(level=logging.DEBUG)
     main()
