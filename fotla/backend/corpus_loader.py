@@ -1,9 +1,13 @@
 import abc
 import json
-from typing import Dict, Iterator, List
+
+if False:
+    from typing import Dict, Iterator, List, Type
+
 
 from more_itertools import chunked
 from pydantic import BaseModel
+from tqdm import tqdm
 
 
 class Doc(BaseModel):
@@ -18,19 +22,26 @@ class CorpusLoader(abc.ABC):
 
 
 class JsonlCorpusLoader(CorpusLoader):
-    def __init__(self, path: str) -> None:
+    def __init__(
+        self, path: str, data_type: Type[Doc] = Doc, verbose: bool = True
+    ) -> None:
         self.path = path
+        self.data_type = data_type
+        self.verbose = verbose
 
     def iter_lines(self, path: str) -> Iterator[Doc]:
         with open(path) as f:
             for i, line in enumerate(f):
                 doc_dict = json.loads(line)
-                doc = Doc(**doc_dict)
+                doc = self.data_type(**doc_dict)
 
                 yield doc
 
     def load(self, batch_size: int = 10_000) -> Iterator[List[Doc]]:
-        for chunk in chunked(self.iter_lines(self.path), batch_size):
+        iterator = chunked(self.iter_lines(self.path), batch_size)
+        if self.verbose:
+            iterator = tqdm(iterator, desc="Loading corpus")
+        for chunk in iterator:
             yield chunk
 
 

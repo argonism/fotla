@@ -50,14 +50,17 @@ class DenseRetriever(Retriever):
             embs: np.ndarray, docids: List[str], docs_chunk: List[Doc]
         ):
             for emb, docid, doc in zip(embs, docids, docs_chunk):
-                yield Record(emb, docid, doc.title, doc.text)
+                yield Record(vec=emb, doc_id=docid, title=doc.title, text=doc.text)
 
+        write_total = 0
         for docs_chunk in corpus_loader.load(batch_size=batch_size):
             embeddings, docids = self.encode_docs(docs_chunk)
-            self.vector_indexer.index(
+            write_count = self.vector_indexer.index(
                 yield_doc_vector(embeddings, docids, docs_chunk)
             )
+            write_total += write_count
+        logger.info(f"Indexed {write_total} documents.")
 
     def retrieve(self, queries: List[str], top_k: int) -> List[Tuple]:
         embeddings = self.encode_queries(queries)
-        return self.vector_indexer.query(queries, embeddings, top_k)
+        return self.vector_indexer.query_vectors(queries, embeddings, top_k)

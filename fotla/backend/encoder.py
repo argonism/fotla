@@ -4,6 +4,7 @@ from typing import Iterable, List, Tuple
 
 import numpy as np
 from more_itertools import chunked
+from tqdm import tqdm
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
 
 from fotla.backend.corpus_loader import CorpusLoader, Doc
@@ -58,7 +59,8 @@ class HFSymetricDenseEncoder(DenseEncoder):
         self, docs: Iterable[str], pooling: str = "mean", batch_size: int = 16
     ) -> np.ndarray:
         embeddings = []
-        for i, chunk in enumerate(chunked(docs, batch_size)):
+        docs_iter = tqdm(docs) if self.verbose else docs
+        for i, chunk in enumerate(chunked(docs_iter, batch_size)):
             inputs = self.tokenizer(
                 chunk, padding=True, truncation=True, return_tensors='pt'
             )
