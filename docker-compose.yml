@@ -5,13 +5,20 @@ services:
     build:
       context: .
       dockerfile: fotla/backend/Dockerfile
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
     working_dir: /usr/fotla
     tty: true
     ports:
       - 9999:9999
     volumes:
       - ./:/usr/fotla
-    entrypoint: python main.py
+    entrypoint: python esa.py
     depends_on:
       elasticsearch:
         condition: service_healthy

@@ -2,6 +2,7 @@ import abc
 from logging import getLogger
 from typing import Iterable, List, Tuple
 
+import torch
 import numpy as np
 from more_itertools import chunked
 from tqdm import tqdm
@@ -22,17 +23,23 @@ class DenseEncoder(abc.ABC):
 
 
 class HFSymetricDenseEncoder(DenseEncoder):
-    def __init__(self, model_path: str, verbose: bool = True) -> None:
-        self.tokenizer, self.model = self.load_model(model_path)
+    def __init__(self, model_path: str, verbose: bool = True, device: str = "cuda:0") -> None:
+        self.device = device
         self.verbose = verbose
 
+        self.tokenizer, self.model = self.load_model(model_path, device=self.device)
+
     def load_model(
-        self, model_path: str
+        self, model_path: str, device: str
     ) -> Tuple[PreTrainedTokenizerBase, PreTrainedModel]:
         from transformers import AutoModel, AutoTokenizer
 
         tokenizer = AutoTokenizer.from_pretrained(model_path)
         model = AutoModel.from_pretrained(model_path)
+
+        model.eval()
+        model.to(device)
+
         return tokenizer, model
 
     def pooling(
@@ -64,12 +71,15 @@ class HFSymetricDenseEncoder(DenseEncoder):
             inputs = self.tokenizer(
                 chunk, padding=True, truncation=True, return_tensors='pt'
             )
-            outputs = self.model(**inputs)
+            inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
-            outputs = self.pooling(
-                outputs[0], inputs['attention_mask'], pooling_method=pooling
-            )
-            embeddings.append(outputs.detach().numpy())
+            with torch.no_grad():
+                outputs = self.model(**inputs)
+
+                outputs = self.pooling(
+                    outputs[0], inputs['attention_mask'], pooling_method=pooling
+                )
+                embeddings.append(outputs.detach().cpu().numpy())
 
         if self.verbose:
             logger.info(f"Encoded {len(embeddings)} documents.")
