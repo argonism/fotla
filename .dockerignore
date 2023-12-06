@@ -23,3 +23,5 @@ coverage.xml
 .vscode
 docs
 tests
+node_modules
+build
