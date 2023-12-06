@@ -6,9 +6,10 @@
     export let topk: number;
     export let term_filter: boolean;
     export let query = "";
+    let compositioning = false;
 
     const onSearchKeyDown = function (event: KeyboardEvent) {
-        if (event.key === "Enter") {
+        if (event.key === "Enter" && !compositioning) {
             const search_params = {
                 query: query,
                 topk: `${topk}`,
@@ -16,7 +17,6 @@
                 from: "0",
                 size: "10",
             };
-
             const searchParams = new URLSearchParams(search_params);
             goto("/search?" + searchParams.toString());
         }
@@ -32,6 +32,8 @@
             placeholder="search ..."
             bind:value={query}
             on:keydown={onSearchKeyDown}
+            on:compositionstart={() => (compositioning = true)}
+            on:compositionend={() => (compositioning = false)}
         />
     </label>
     <Accordion>
