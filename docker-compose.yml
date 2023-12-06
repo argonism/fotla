@@ -18,7 +18,7 @@ services:
       - 9999:9999
     volumes:
       - ./:/usr/fotla
-    entrypoint: python esa.py
+    entrypoint: python esa.py --index
     depends_on:
       elasticsearch:
         condition: service_healthy
@@ -29,7 +29,7 @@ services:
   elasticsearch:
     build:
       context: .
-      dockerfile: vector_indexer/elasticsearch/Dockerfile
+      dockerfile: vector_indexer/elasticsearch/Dockerfile.jp
       args:
         - ELASTIC_VERSION=${ELASTIC_VERSION}
     environment:
@@ -55,6 +55,25 @@ services:
       interval: 10s
       timeout: 10s
       retries: 120
+
+  fotla-frontend:
+    build:
+      context: fotla/frontend/svelte
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=development
+      - FOTLA_SEARCH_URL=http://fotla-backend:9999/search
+      - PORT=5173
+    ports:
+      - 5173:5173
+    volumes:
+      - ./fotla/frontend/svelte/src:/app/src
+      - ./fotla/frontend/svelte/static:/app/static
+      - ./fotla/frontend/svelte/vite.config.js:/app/vite.config.js
+      - ./fotla/frontend/svelte/tsconfig.json:/app/tsconfig.json
+      - ./fotla/frontend/svelte/svelte.config.js:/app/svelte.config.js
+      - ./fotla/frontend/svelte/theme.ts:/app/theme.ts
+      - ./fotla/frontend/svelte/tailwind.config.ts:/app/tailwind.config.ts
 
 volumes:
   esdata1:
