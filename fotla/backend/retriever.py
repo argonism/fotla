@@ -41,6 +41,24 @@ class DenseRetriever(Retriever):
     def encode_queries(self, queries: Iterable[str]) -> np.ndarray:
         return self.encoder.encode_queries(queries)
 
+    def async_index(
+        self, corpus_loader: CorpusLoader, batch_size: int = 10_000
+    ) -> None:
+        def yield_doc_vector(
+            embs: np.ndarray, docids: List[str], docs_chunk: List[Doc]
+        ):
+            for emb, docid, doc in zip(embs, docids, docs_chunk):
+                yield Record(vec=emb, doc_id=docid, title=doc.title, text=doc.text)
+
+        write_total = 0
+        for docs_chunk in corpus_loader.load(batch_size=batch_size):
+            embeddings, docids = self.encode_docs(docs_chunk)
+            write_count = self.vector_indexer.async_index(
+                yield_doc_vector(embeddings, docids, docs_chunk)
+            )
+            write_total += write_count
+        logger.info(f"Indexed {write_total} documents.")
+
     def index(
         self,
         corpus_loader: CorpusLoader,

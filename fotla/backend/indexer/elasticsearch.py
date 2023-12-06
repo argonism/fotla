@@ -32,11 +32,12 @@ class ElasticsearchIndexer(DenseIndexer):
         recreate_index: bool = False,
     ) -> None:
         self.config = config
+        self.fields = fields
         self.es = elasticsearch.Elasticsearch(
             f"{self.config.schema}://{self.config.host}:{self.config.port}",
         )
         self.index_name = self.config.index_name
-        self.fields = fields
+        logger.info(f"setting index: {self.index_name}")
 
         if recreate_index and self.exist_index(self.index_name):
             self.delete_index(self.index_name)
@@ -116,18 +117,23 @@ class ElasticsearchIndexer(DenseIndexer):
                 }
 
         async def main():
+            write_count = 0
             async for ok, result in async_streaming_bulk(
                 es, create_index_body(records)
             ):
                 action, result = result.popitem()
                 if not ok:
                     print(f"failed to {action} document {result}")
+                else:
+                    write_count += 1
+            return write_count
 
         es = elasticsearch.AsyncElasticsearch(
             f"{self.config.schema}://{self.config.host}:{self.config.port}",
         )
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(main())
+        write_count = loop.run_until_complete(main())
+        return write_count
 
     def index(
         self,
