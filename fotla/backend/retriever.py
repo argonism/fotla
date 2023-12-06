@@ -61,6 +61,24 @@ class DenseRetriever(Retriever):
             write_total += write_count
         logger.info(f"Indexed {write_total} documents.")
 
-    def retrieve(self, queries: List[str], top_k: int) -> List[Tuple]:
+    def retrieve(
+        self,
+        queries: List[str],
+        top_k: int,
+        from_: int = 0,
+        size: int = 10,
+        source_field: List[str] = ["doc_id", "title", "text"],
+        hybrid: bool = False,
+        hybrid_field: List[str] = ["title", "text"],
+    ) -> List[Tuple]:
         embeddings = self.encode_queries(queries)
-        return self.vector_indexer.query_vectors(queries, embeddings, top_k)
+
+        return self.vector_indexer.query(
+            queries,
+            term_fields=hybrid_field if hybrid else [],
+            vectors=embeddings,
+            top_k=top_k,
+            from_=from_,
+            size=size,
+            source=source_field,
+        )

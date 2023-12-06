@@ -1,6 +1,6 @@
 import abc
 from dataclasses import dataclass
-from typing import Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 
@@ -19,22 +19,15 @@ class DenseIndexer(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def query_vectors(
-        self, queries: List[str], vectors: List[np.ndarray], top_k: int
-    ) -> List[Tuple]:
-        raise NotImplementedError
-
-
-class SparseIndexer(abc.ABC):
-    @abc.abstractmethod
-    def index(self, records: Iterable[Record]) -> int:
-        raise NotImplementedError
-
-    @abc.abstractmethod
     def query(
         self,
         queries: List[str],
-        top_k: int,
-        vectors: Optional[List[np.ndarray]] = None,
-    ) -> List[Tuple]:
+        term_fields: List[str] = [],
+        vectors: List[np.ndarray] = [],
+        vec_field: str = "vec",
+        top_k: int = 10,
+        from_: int = 0,
+        size: int = 10,
+        source: Optional[List[str]] = None,
+    ) -> List[Tuple[str, Dict]]:
         raise NotImplementedError

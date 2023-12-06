@@ -23,7 +23,9 @@ class DenseEncoder(abc.ABC):
 
 
 class HFSymetricDenseEncoder(DenseEncoder):
-    def __init__(self, model_path: str, verbose: bool = True, device: str = "cuda:0") -> None:
+    def __init__(
+        self, model_path: str, verbose: bool = True, device: str = "cuda:0"
+    ) -> None:
         self.device = device
         self.verbose = verbose
 

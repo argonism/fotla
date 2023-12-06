@@ -1,3 +1,4 @@
+import os
 from typing import Any, Dict
 
 import uvicorn
@@ -7,25 +8,16 @@ from pydantic import BaseModel
 
 from .encoder import Retriever
 
+is_dev = (
+    os.environ.get("FOTLA_ENV", "dev") == "dev"
+    or os.environ.get("FOTLA_ENV", "dev") == "development"
+)
+
 
 def start_api(retriever: Retriever, host: str = "0.0.0.0", port: int = 8000) -> None:
     app = load_fastapi_app(retriever)
-    origins = [
-        "http://localhost:5173",
-    ]
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-    uvicorn.run(
-        app,
-        host=host,
-        port=port,
-    )
+    uvicorn.run(app, host=host, port=port)
 
 
 def load_fastapi_app(retriever: Retriever) -> FastAPI:
@@ -37,9 +29,18 @@ def load_fastapi_app(retriever: Retriever) -> FastAPI:
 def setup_api_endpoint(app: FastAPI, retriever: Retriever) -> None:
     class SearchRequest(BaseModel):
         query: str
-        topk: int = 100
+        topk: int = 200
+        from_: int = 0
+        size: int = 10
+        hybrid: bool = False
 
     @app.post("/search")
     async def search(request: SearchRequest) -> Dict[str, Any]:
-        result = retriever.retrieve([request.query], request.topk)
+        result = retriever.retrieve(
+            [request.query],
+            top_k=request.topk,
+            from_=request.from_,
+            size=request.size,
+            hybrid=request.hybrid,
+        )
         return {"status": "success", "result": result}

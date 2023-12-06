@@ -1,6 +1,6 @@
 import abc
 import json
-from typing import Dict, Iterator, List
+from typing import Dict, Iterator, List, Optional
 
 from more_itertools import chunked
 from pydantic import BaseModel

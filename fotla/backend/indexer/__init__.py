@@ -1,1 +1,1 @@
-from .base import DenseIndexer, Record, SparseIndexer
+from .base import DenseIndexer, Record

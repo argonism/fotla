@@ -5,9 +5,10 @@ from typing import Dict, Iterable, List, Optional, Tuple
 
 import elasticsearch
 import numpy as np
+from tqdm import tqdm
 
 from fotla.backend.corpus_loader import CorpusLoader
-from fotla.backend.indexer import DenseIndexer, Record, SparseIndexer
+from fotla.backend.indexer import DenseIndexer, Record
 from fotla.backend.retriever import Retriever
 from fotla.backend.utils import project_dir
 
@@ -23,7 +24,7 @@ class ElasticsearchConfig:
     index_scheme_path: str = project_dir / "vector_indexer/elasticsearch/mappngs.json"
 
 
-class ElasticsearchIndexer(DenseIndexer, SparseIndexer):
+class ElasticsearchIndexer(DenseIndexer):
     def __init__(
         self,
         config: ElasticsearchConfig,
@@ -83,6 +84,51 @@ class ElasticsearchIndexer(DenseIndexer, SparseIndexer):
         """
         return self.es.indices.exists(index=index_name)
 
+    def async_index(self, records: Iterable[Record]) -> None:
+        try:
+            import asyncio
+        except ImportError:
+            raise ImportError("asyncio is required for async_index")
+
+        try:
+            from elasticsearch.helpers import async_streaming_bulk
+        except ImportError:
+            raise ImportError("elasticsearch-async is required for async_index")
+
+        from typing import AsyncIterable
+
+        async def create_index_body(records: Iterable[Record]) -> AsyncIterable[Dict]:
+            for record in records:
+                body = {
+                    "doc_id": record.doc_id,
+                    "title": record.title,
+                    "text": record.text,
+                }
+
+                if record.vec is not None:
+                    unit_vec = record.vec / np.linalg.norm(record.vec)
+                    body["vec"] = unit_vec
+
+                yield {
+                    "_op_type": "index",
+                    "_index": self.index_name,
+                    "_source": body,
+                }
+
+        async def main():
+            async for ok, result in async_streaming_bulk(
+                es, create_index_body(records)
+            ):
+                action, result = result.popitem()
+                if not ok:
+                    print(f"failed to {action} document {result}")
+
+        es = elasticsearch.AsyncElasticsearch(
+            f"{self.config.schema}://{self.config.host}:{self.config.port}",
+        )
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(main())
+
     def index(
         self,
         records: Iterable[Record],
@@ -125,8 +171,16 @@ class ElasticsearchIndexer(DenseIndexer, SparseIndexer):
 
         return write_count
 
-    def query_vectors(
-        self, queries: List[str], vectors: List[np.ndarray], top_k: int
+    def query(
+        self,
+        queries: List[str],
+        term_fields: List[str] = [],
+        vectors: List[np.ndarray] = [],
+        vec_field: str = "vec",
+        top_k: int = 10,
+        from_: int = 0,
+        size: int = 10,
+        source: Optional[List[str]] = None,
     ) -> List[Tuple[str, Dict]]:
         """Returns the top_k most similar vectors to the given vectors.
 
@@ -139,60 +193,56 @@ class ElasticsearchIndexer(DenseIndexer, SparseIndexer):
         """
         logger.debug(f"Querying {len(queries)} queries.")
 
+        if len(vectors) <= 0 and len(term_fields) <= 0:
+            raise ValueError("Either vectors or term_field must be given.")
+
+        if len(vectors) > 0 and len(vectors) != len(queries):
+            raise ValueError(
+                "The number of vectors must be equal to the number of queries."
+            )
+
         results: List[Tuple[str, Dict]] = []
-        for query, vec in zip(queries, vectors):
+        for i, query in enumerate(queries):
             logger.debug(f"Retrieving with query: {query}")
 
-            unit_vec = vec / np.linalg.norm(vec)
-            knn_param = {
-                "field": "vec",
-                "query_vector": unit_vec,
-                "k": 10,
-                "num_candidates": 100,
-            }
+            vec = vectors[i] if len(vectors) > 0 else None
+            knn_param = None
+            if vec is not None:
+                unit_vec = vec / np.linalg.norm(vec)
+                knn_param = {
+                    "field": "vec",
+                    "query_vector": unit_vec,
+                    "k": top_k,
+                    "num_candidates": top_k * 2,
+                }
+
+            term_query = (
+                None
+                if len(term_fields) <= 0
+                else {
+                    "multi_match": {
+                        "query": query,
+                        "fields": term_fields,
+                    }
+                }
+            )
+
             res = self.es.search(
                 index=self.index_name,
                 knn=knn_param,
-                source=["doc_id", "title", "text"]
-                if self.fields is None
-                else self.fields,
+                query=term_query,
+                source=self.fields if source is None else source,
+                from_=from_,
+                size=size,
             )
-            result = res["hits"]["hits"]
+            result = {
+                "total": res["hits"]["total"]["value"],
+                "hits": res["hits"]["hits"],
+            }
+            logger.debug(f"query {query} retrieved {len(result['hits'])} results.")
             results.append((query, result))
 
             logger.debug(f"Retrieved {len(result)} results.")
-        return results
-
-    def query(
-        self,
-        queries: List[str],
-        top_k: int,
-        fields: Optional[List[str]] = ["title", "text"],
-    ) -> List[Tuple[str, Dict]]:
-        """Returns the top_k most similar documents to the given queries.
-
-        Args:
-            queries: The queries to query.
-            top_k: The number of similar documents to return.
-            fields: The fields to search in.
-
-        Returns:
-            The indices of the top_k most similar documents.
-        """
-
-        results: List[Tuple[str, Dict]] = []
-        for query in queries:
-            request_body = {
-                "query": {
-                    "multi_match": {
-                        "query": query,
-                        "fields": fields,
-                    }
-                },
-                "_source": ["doc_id", "title", "text"],
-            }
-            res = self.es.search(index=self.index_name, body=request_body)
-            results.append((query, res["hits"]["hits"]))
         return results
 
 
@@ -205,18 +255,53 @@ class ElasticsearchBM25(Retriever):
         self.es_indexer = es_indexer
         self.fields = fields
 
+    def async_index(
+        self,
+        corpus_loader: CorpusLoader,
+        batch_size: int = 10_000,
+        total: int = 65613666,
+    ) -> None:
+        def load_corpus(
+            corpus_loader: CorpusLoader, batch_size: int
+        ) -> Iterable[Record]:
+            for docs_chunk in tqdm(
+                corpus_loader.load(batch_size=batch_size),
+                desc="loading corpus..",
+                total=(total // batch_size) + 1,
+            ):
+                for doc in docs_chunk:
+                    yield Record(doc_id=doc.doc_id, title=doc.title, text=doc.text)
+
+        self.es_indexer.async_index(load_corpus(corpus_loader, batch_size))
+
     def index(
         self,
         corpus_loader: CorpusLoader,
         batch_size: int = 10_000,
+        total: int = 65613666,
     ) -> None:
-        for docs_chunk in corpus_loader.load(batch_size=batch_size):
+        for docs_chunk in tqdm(
+            corpus_loader.load(batch_size=batch_size),
+            desc="indexing..",
+            total=(total // batch_size) + 1,
+        ):
             self.es_indexer.index(
                 [
                     Record(doc_id=doc.doc_id, title=doc.title, text=doc.text)
                     for doc in docs_chunk
-                ]
+                ],
+                refresh=False,
             )
 
-    def retrieve(self, queries: List[str], top_k: int) -> List[Tuple[str, Dict]]:
-        return self.es_indexer.query(queries, top_k, self.fields)
+    def retrieve(
+        self,
+        queries: List[str],
+        top_k: int,
+        from_: int = 0,
+        size: int = 10,
+        hybrid: bool = False,
+    ) -> List[Tuple[str, Dict]]:
+        result = self.es_indexer.query(
+            queries, term_fields=self.fields, top_k=top_k, from_=from_, size=size
+        )
+        return result
