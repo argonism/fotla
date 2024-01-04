@@ -5,6 +5,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 
 import elasticsearch
 import numpy as np
+from pydantic import BaseModel
 from tqdm import tqdm
 
 from fotla.backend.corpus_loader import CorpusLoader
@@ -85,7 +86,7 @@ class ElasticsearchIndexer(DenseIndexer):
         """
         return self.es.indices.exists(index=index_name)
 
-    def async_index(self, records: Iterable[Record]) -> None:
+    def async_index(self, records: Iterable[BaseModel]) -> None:
         try:
             import asyncio
         except ImportError:
@@ -98,17 +99,11 @@ class ElasticsearchIndexer(DenseIndexer):
 
         from typing import AsyncIterable
 
-        async def create_index_body(records: Iterable[Record]) -> AsyncIterable[Dict]:
+        async def async_create_index_body(
+            records: Iterable[BaseModel],
+        ) -> AsyncIterable[Dict]:
             for record in records:
-                body = {
-                    "doc_id": record.doc_id,
-                    "title": record.title,
-                    "text": record.text,
-                }
-
-                if record.vec is not None:
-                    unit_vec = record.vec / np.linalg.norm(record.vec)
-                    body["vec"] = unit_vec
+                body = self.create_index_body(record, self.fields)
 
                 yield {
                     "_op_type": "index",
@@ -119,7 +114,7 @@ class ElasticsearchIndexer(DenseIndexer):
         async def main():
             write_count = 0
             async for ok, result in async_streaming_bulk(
-                es, create_index_body(records)
+                es, async_create_index_body(records)
             ):
                 action, result = result.popitem()
                 if not ok:
@@ -135,9 +130,30 @@ class ElasticsearchIndexer(DenseIndexer):
         write_count = loop.run_until_complete(main())
         return write_count
 
+    def create_index_body(
+        self, record: BaseModel, fields: Optional[List[str]]
+    ) -> Dict:
+        if fields is None:
+            body = {
+                "doc_id": record.doc_id,
+                "title": record.title,
+                "text": record.text,
+            }
+        else:
+            body = {}
+            record_dict = record.asdict()
+            for field in fields:
+                body[field] = record_dict.get(field, None)
+
+        if record.vec is not None:
+            unit_vec = record.vec / np.linalg.norm(record.vec)
+            body["vec"] = unit_vec
+
+        return body
+
     def index(
         self,
-        records: Iterable[Record],
+        records: Iterable[BaseModel],
         refresh: bool = True,
     ) -> int:
         """Indexes the given vectors.
@@ -149,28 +165,9 @@ class ElasticsearchIndexer(DenseIndexer):
             The number of vectors fitted.
         """
 
-        def create_index_body(record: Record, fields: Optional[List[str]]) -> Dict:
-            if fields is None:
-                body = {
-                    "doc_id": record.doc_id,
-                    "title": record.title,
-                    "text": record.text,
-                }
-            else:
-                body = {}
-                record_dict = record.asdict()
-                for field in fields:
-                    body[field] = record_dict.get(field, None)
-
-            if record.vec is not None:
-                unit_vec = record.vec / np.linalg.norm(record.vec)
-                body["vec"] = unit_vec
-
-            return body
-
         write_count = 0
         for record in records:
-            body = create_index_body(record, self.fields)
+            body = self.create_index_body(record, self.fields)
 
             self.es.index(index=self.index_name, body=body, refresh=refresh)
             write_count += 1
@@ -269,14 +266,14 @@ class ElasticsearchBM25(Retriever):
     ) -> None:
         def load_corpus(
             corpus_loader: CorpusLoader, batch_size: int
-        ) -> Iterable[Record]:
+        ) -> Iterable[BaseModel]:
             for docs_chunk in tqdm(
                 corpus_loader.load(batch_size=batch_size),
                 desc="loading corpus..",
                 total=(total // batch_size) + 1,
             ):
                 for doc in docs_chunk:
-                    yield Record(doc_id=doc.doc_id, title=doc.title, text=doc.text)
+                    yield doc
 
         self.es_indexer.async_index(load_corpus(corpus_loader, batch_size))
 
@@ -292,10 +289,7 @@ class ElasticsearchBM25(Retriever):
             total=(total // batch_size) + 1,
         ):
             self.es_indexer.index(
-                [
-                    Record(doc_id=doc.doc_id, title=doc.title, text=doc.text)
-                    for doc in docs_chunk
-                ],
+                docs_chunk,
                 refresh=False,
             )
 

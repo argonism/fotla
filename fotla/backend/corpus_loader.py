@@ -17,7 +17,7 @@ class Doc(BaseModel):
 
 
 class CorpusLoader(abc.ABC):
-    def load(self, batch_size: int = 10_000) -> Iterator[List[Doc]]:
+    def load(self, batch_size: int = 10_000) -> Iterator[List[BaseModel]]:
         raise NotImplementedError
 
 
@@ -29,7 +29,7 @@ class JsonlCorpusLoader(CorpusLoader):
         self.data_type = data_type
         self.verbose = verbose
 
-    def iter_lines(self, path: str) -> Iterator[Doc]:
+    def iter_lines(self, path: str) -> Iterator[BaseModel]:
         with open(path) as f:
             for i, line in enumerate(f):
                 doc_dict = json.loads(line)
@@ -37,7 +37,7 @@ class JsonlCorpusLoader(CorpusLoader):
 
                 yield doc
 
-    def load(self, batch_size: int = 10_000) -> Iterator[List[Doc]]:
+    def load(self, batch_size: int = 10_000) -> Iterator[List[BaseModel]]:
         iterator = chunked(self.iter_lines(self.path), batch_size)
         if self.verbose:
             iterator = tqdm(iterator, desc="Loading corpus")
@@ -52,6 +52,6 @@ class AdhocCorpusLoader(CorpusLoader):
     def dict_to_doc(self, dicts: List[Dict]) -> List[Doc]:
         return [Doc(**doc) for doc in dicts]
 
-    def load(self, batch_size: int = 10_000) -> Iterator[List[Doc]]:
+    def load(self, batch_size: int = 10_000) -> Iterator[List[BaseModel]]:
         for chunk in chunked(self.docs, batch_size):
             yield self.dict_to_doc(chunk)

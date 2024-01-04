@@ -35,7 +35,7 @@
             {#each search_result as item}
                 {#if item._source.url !== ""}
                     <a
-                        href="https://kasys.esa.io/posts/{item._source.doc_id}"
+                        href={item._source.url}
                         target="_blank"
                         class="w-full mx-auto"
                     >

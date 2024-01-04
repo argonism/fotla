@@ -10,7 +10,8 @@
     <hr
         class="h-px my-2 w-99% bg-surface-100 border-0 dark:bg-gray-700 mx-auto"
     />
-    <section class="p-5 text-ellipsis overflow-hidden max-w-full max-h-20">
-        {item._source.text}...
+    <!-- <section class="p-5 text-ellipsis overflow-hidden max-w-full max-h-20"> -->
+    <section class="p-5 max-w-full">
+        {item._source.text}
     </section>
 </div>

@@ -1,10 +1,11 @@
 import abc
 from logging import getLogger
-from typing import Iterable, List, Tuple
+from typing import Callable, Iterable, List, Tuple
 
-import torch
 import numpy as np
+import torch
 from more_itertools import chunked
+from pydantic import BaseModel
 from tqdm import tqdm
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
 
@@ -107,21 +108,23 @@ class Retriever(abc.ABC):
         raise NotImplementedError
 
 
+def docs_to_texts(self, docs: Iterable[Doc]) -> Tuple[List[str], List[str]]:
+    docids = []
+    texts = []
+    for doc in docs:
+        docids.append(doc.doc_id)
+        texts.append(doc.text + " " + doc.title)
+    return texts, docids
+
+
 class DenseRetriever(Retriever):
     def __init__(self, encoder: DenseEncoder, vector_indexer: DenseIndexer) -> None:
         self.encoder = encoder
         self.vector_indexer = vector_indexer
 
-    def docs_to_texts(self, docs: Iterable[Doc]) -> Tuple[List[str], List[str]]:
-        docids = []
-        texts = []
-        for doc in docs:
-            docids.append(doc.doc_id)
-            texts.append(doc.text + " " + doc.title)
-        return texts, docids
-
-    def encode_docs(self, docs: Iterable[Doc]) -> Tuple[np.ndarray, List[str]]:
-        texts, docids = self.docs_to_texts(docs)
+    def encode_docs(
+        self, texts: List[str], docids: List[str]
+    ) -> Tuple[np.ndarray, List[str]]:
         return self.encoder.encode_corpus(texts), docids
 
     def encode_queries(self, queries: Iterable[str]) -> np.ndarray:
@@ -130,6 +133,9 @@ class DenseRetriever(Retriever):
     def index(
         self,
         corpus_loader: CorpusLoader,
+        doc_preprocesser: Callable[
+            [Iterable[BaseModel]], Tuple[List[str], List[str]]
+        ] = docs_to_texts,
         batch_size: int = 10_000,
     ) -> None:
         def yield_doc_vector(
@@ -139,7 +145,7 @@ class DenseRetriever(Retriever):
                 yield Record(emb, docid, doc.title, doc.text)
 
         for docs_chunk in corpus_loader.load(batch_size=batch_size):
-            embeddings, docids = self.encode_docs(docs_chunk)
+            embeddings, docids = self.encode_docs(doc_preprocesser(docs_chunk))
             self.vector_indexer.index(
                 yield_doc_vector(embeddings, docids, docs_chunk)
             )
