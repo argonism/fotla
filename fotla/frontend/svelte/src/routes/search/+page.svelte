@@ -15,12 +15,14 @@
     let search_opt_params = getSearchOptParams($page.url.searchParams);
     let topk = search_opt_params.topk;
     let term_filter = search_opt_params.hybrid;
+    let search_fields = search_opt_params.search_fields;
 
     function buildSearchAPIParams(): string {
         const search_params = {
             query: data.query,
             topk: `${topk}`,
             hybrid: `${Number(term_filter)}`,
+            search_fields: search_fields.join(","),
         };
 
         const searchParams = new URLSearchParams(search_params);
@@ -30,10 +32,17 @@
 
 <div class="container mx-auto flex justify-center items-center">
     <div class="space-y-4 text-center flex flex-col items-center w-10/12">
-        <SearchBox {topk} {term_filter} {query} />
+        <SearchBox {topk} {term_filter} {query} {search_fields} />
         {#if search_result.length > 0}
             {#each search_result as item}
-                {#if item._source.url !== ""}
+                <a
+                    href={`https://kdb.tsukuba.ac.jp/syllabi/2023/${item._source.subject_number}/jpn/0`}
+                    target="_blank"
+                    class="w-full mx-auto"
+                >
+                    <ResultCard {item} />
+                </a>
+                <!-- {#if item._source.url !== ""}
                     <a
                         href={item._source.url}
                         target="_blank"
@@ -43,7 +52,7 @@
                     </a>
                 {:else}
                     <ResultCard {item} />
-                {/if}
+                {/if} -->
             {/each}
             <Pagenation
                 params={pagenation_params}

@@ -5,7 +5,7 @@ import { parseSearchParams } from '../../lib/utils/util';
 /** @type {import('./$types').PageServerLoad} */
 export async function load({ url, fetch }: ServerLoadEvent) {
     // const { query, topk } = await request.json();
-    const { query, topk, hybrid, from, size } = parseSearchParams(url.searchParams);
+    const { query, topk, hybrid, from, size, search_fields } = parseSearchParams(url.searchParams);
 
     if (env.FOTLA_SEARCH_URL == null) {
         throw new Error("FOTLA_SEARCH_URL is not set");
@@ -15,7 +15,7 @@ export async function load({ url, fetch }: ServerLoadEvent) {
         headers: {
             "Content-Type": "application/json",
         },
-        body: JSON.stringify({ query, topk, hybrid, size, from_: from, }),
+        body: JSON.stringify({ query, topk, hybrid, size, from_: from, search_fields }),
     });
     const response_json = await response.json();
 

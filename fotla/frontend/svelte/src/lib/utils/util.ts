@@ -22,8 +22,9 @@ export function getSearchOptParams(
     }
     const topk = parseInt(searchParams.get("topk") ?? "10");
     const hybrid = Boolean(parseInt(searchParams.get("hybrid") ?? "0"));
+    const search_fields = searchParams.get("search_fields")?.split(",") ?? [""];
 
-    return { query, topk, hybrid };
+    return { query, topk, hybrid, search_fields };
 }
 
 export function parseSearchParams(searchParams: URLSearchParams): SearchAPIParams {
