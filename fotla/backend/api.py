@@ -1,5 +1,5 @@
 import os
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import uvicorn
 from fastapi import FastAPI
@@ -32,7 +32,8 @@ def setup_api_endpoint(app: FastAPI, retriever: Retriever) -> None:
         topk: int = 200
         from_: int = 0
         size: int = 10
-        hybrid: bool = False
+        hybrid: bool = True
+        search_fields: List[str] = ["subject_number", "subject_number", "overview"]
 
     @app.post("/search")
     async def search(request: SearchRequest) -> Dict[str, Any]:
@@ -42,5 +43,6 @@ def setup_api_endpoint(app: FastAPI, retriever: Retriever) -> None:
             from_=request.from_,
             size=request.size,
             hybrid=request.hybrid,
+            search_fields=request.search_fields,
         )
         return {"status": "success", "result": result}
