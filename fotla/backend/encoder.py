@@ -10,7 +10,7 @@ from tqdm import tqdm
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
 
 from fotla.backend.corpus_loader import CorpusLoader, Doc
-from fotla.backend.indexer import DenseIndexer, Record
+from fotla.backend.indexer import DenseIndexer, VecRecord
 
 logger = getLogger(__name__)
 
@@ -69,7 +69,7 @@ class HFSymetricDenseEncoder(DenseEncoder):
         self, docs: Iterable[str], pooling: str = "mean", batch_size: int = 16
     ) -> np.ndarray:
         embeddings = []
-        docs_iter = tqdm(docs) if self.verbose else docs
+        docs_iter = tqdm(docs, desc="encoding") if self.verbose else docs
         for i, chunk in enumerate(chunked(docs_iter, batch_size)):
             inputs = self.tokenizer(
                 chunk, padding=True, truncation=True, return_tensors='pt'
@@ -136,13 +136,13 @@ class DenseRetriever(Retriever):
         doc_preprocesser: Callable[
             [Iterable[BaseModel]], Tuple[List[str], List[str]]
         ] = docs_to_texts,
-        batch_size: int = 10_000,
+        batch_size: int = 100,
     ) -> None:
         def yield_doc_vector(
             embs: np.ndarray, docids: List[str], docs_chunk: List[Doc]
         ):
             for emb, docid, doc in zip(embs, docids, docs_chunk):
-                yield Record(emb, docid, doc.title, doc.text)
+                yield VecRecord(emb, docid, doc.title, doc.text)
 
         for docs_chunk in corpus_loader.load(batch_size=batch_size):
             embeddings, docids = self.encode_docs(doc_preprocesser(docs_chunk))

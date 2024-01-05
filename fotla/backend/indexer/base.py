@@ -1,21 +1,27 @@
 import abc
-from dataclasses import dataclass
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Annotated, Any, Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
+from pydantic import BaseModel, PlainValidator, ValidationInfo
 
 
-@dataclass
-class Record:
-    doc_id: str
-    vec: Optional[np.ndarray] = None
-    title: Optional[str] = None
-    text: Optional[str] = None
+def ndarray_valicate(v: Any, info: ValidationInfo) -> np.ndarray:
+    if not isinstance(v, np.ndarray):
+        raise TypeError("must be a numpy.ndarray")
+    return v
+
+
+NdArray = Annotated[np.ndarray, PlainValidator(ndarray_valicate)]
+
+
+class VecRecord(BaseModel):
+    doc: BaseModel
+    vec: Optional[NdArray] = None
 
 
 class DenseIndexer(abc.ABC):
     @abc.abstractmethod
-    def index(self, records: Iterable[Record]) -> int:
+    def index(self, records: Iterable[VecRecord]) -> int:
         raise NotImplementedError
 
     @abc.abstractmethod

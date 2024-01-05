@@ -1,1 +1,1 @@
-from .base import DenseIndexer, Record
+from .base import DenseIndexer, VecRecord

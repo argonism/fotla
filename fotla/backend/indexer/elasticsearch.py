@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from tqdm import tqdm
 
 from fotla.backend.corpus_loader import CorpusLoader
-from fotla.backend.indexer import DenseIndexer, Record
+from fotla.backend.indexer import DenseIndexer, VecRecord
 from fotla.backend.retriever import Retriever
 from fotla.backend.utils import project_dir
 
@@ -133,6 +133,10 @@ class ElasticsearchIndexer(DenseIndexer):
     def create_index_body(
         self, record: BaseModel, fields: Optional[List[str]]
     ) -> Dict:
+        vec = None
+        if isinstance(record, VecRecord):
+            record, vec = record.doc, record.vec
+
         if fields is None:
             body = {
                 "doc_id": record.doc_id,
@@ -141,12 +145,12 @@ class ElasticsearchIndexer(DenseIndexer):
             }
         else:
             body = {}
-            record_dict = record.asdict()
+            record_dict = record.model_dump()
             for field in fields:
                 body[field] = record_dict.get(field, None)
 
-        if record.vec is not None:
-            unit_vec = record.vec / np.linalg.norm(record.vec)
+        if vec is not None:
+            unit_vec = vec / np.linalg.norm(vec)
             body["vec"] = unit_vec
 
         return body
@@ -184,6 +188,7 @@ class ElasticsearchIndexer(DenseIndexer):
         from_: int = 0,
         size: int = 10,
         source: Optional[List[str]] = None,
+        operator: str = "and",
     ) -> List[Tuple[str, Dict]]:
         """Returns the top_k most similar vectors to the given vectors.
 
@@ -226,10 +231,12 @@ class ElasticsearchIndexer(DenseIndexer):
                     "multi_match": {
                         "query": query,
                         "fields": term_fields,
+                        "operator": operator,
                     }
                 }
             )
 
+            logger.debug(f"term_query: {term_query}")
             res = self.es.search(
                 index=self.index_name,
                 knn=knn_param,
@@ -297,11 +304,13 @@ class ElasticsearchBM25(Retriever):
         self,
         queries: List[str],
         top_k: int,
+        search_fields: Optional[List[str]] = None,
         from_: int = 0,
         size: int = 10,
         hybrid: bool = False,
     ) -> List[Tuple[str, Dict]]:
+        fields = self.fields if search_fields is None else search_fields
         result = self.es_indexer.query(
-            queries, term_fields=self.fields, top_k=top_k, from_=from_, size=size
+            queries, term_fields=fields, top_k=top_k, from_=from_, size=size
         )
         return result

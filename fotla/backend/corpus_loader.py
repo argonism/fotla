@@ -16,6 +16,11 @@ class Doc(BaseModel):
     title: str = ""
 
 
+class Preprocessor(object):
+    def __call__(self, doc: BaseModel) -> BaseModel:
+        raise NotImplementedError
+
+
 class CorpusLoader(abc.ABC):
     def load(self, batch_size: int = 10_000) -> Iterator[List[BaseModel]]:
         raise NotImplementedError
@@ -23,17 +28,24 @@ class CorpusLoader(abc.ABC):
 
 class JsonlCorpusLoader(CorpusLoader):
     def __init__(
-        self, path: str, data_type: "Type[Doc]" = Doc, verbose: bool = True
+        self,
+        path: str,
+        preprocessores: List[Preprocessor] = [],
+        data_type: BaseModel = Doc,
+        verbose: bool = True,
     ) -> None:
         self.path = path
         self.data_type = data_type
         self.verbose = verbose
+        self.preprocessores = preprocessores
 
     def iter_lines(self, path: str) -> Iterator[BaseModel]:
         with open(path) as f:
             for i, line in enumerate(f):
                 doc_dict = json.loads(line)
                 doc = self.data_type(**doc_dict)
+                for preprocessor in self.preprocessores:
+                    doc = preprocessor(doc)
 
                 yield doc
 
